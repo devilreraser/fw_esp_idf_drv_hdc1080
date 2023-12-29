@@ -1,0 +1,7 @@
+menu "Component drv_hdc1080 Configuration"
+
+    config DRV_HDC1080_USE
+        bool "Use drv_hdc1080 component"
+        default y
+        
+endmenu
