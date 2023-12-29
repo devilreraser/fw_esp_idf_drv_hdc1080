@@ -3,5 +3,29 @@ menu "Component drv_hdc1080 Configuration"
     config DRV_HDC1080_USE
         bool "Use drv_hdc1080 component"
         default y
-        
+
+    choice DRV_HDC1080_PORT
+        prompt "Select I2C Index Port"
+        default DRV_HDC1080_SELECT_I2C_INDEX_0
+        depends on DRV_HDC1080_USE
+        help
+            Select I2C Index Port.
+
+        config DRV_HDC1080_SELECT_I2C_INDEX_0
+            bool "I2C1"
+            help
+                DRV_I2C Index 0 Interface.
+
+        config DRV_HDC1080_SELECT_I2C_INDEX_1
+            bool "I2C2"
+            help
+                DRV_I2C Index 1 Interface.
+
+        config DRV_HDC1080_SELECT_NONE
+            bool "NONE"
+            help
+                No Interface.
+
+    endchoice # DRV_HDC1080_PORT
+            
 endmenu
