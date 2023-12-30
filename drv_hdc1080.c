@@ -135,8 +135,9 @@ char* i2c_reg_name[HDC1080_REGISTER_COUNT] =
     "Serial ID[0]", "Serial ID[1]", "Serial ID[2]", "Manufacturer ID", "Device ID", "Temperature", "Humidity", "Configuration",
 };
 TickType_t rdwr_timeout = pdMS_TO_TICKS(10);
+TickType_t meas_timeout = pdMS_TO_TICKS(20);
 TickType_t loop_timeout = pdMS_TO_TICKS(1000);
-TickType_t meas_timeout = pdMS_TO_TICKS(10);
+TickType_t measure_wait = pdMS_TO_TICKS(20);
 bool hdc1080_task_active = false;
 
 drv_i2c_e_index_t i2c_index = DRV_HDC1080_PORT;
@@ -171,14 +172,14 @@ static void hdc1080_read_registers(i2c_e_register_index_t reg_start_index, size_
         i2c_reg_data[reg_start_index + index] = __bswap16(i2c_reg_cfg_swap[index]);
     }
     if (i2c_err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "drv_i2c_master_read_from_register failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr_local, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[reg_start_index]);
+    {                  hdc1080_read_registers           
+        ESP_LOGE(TAG, "hdc1080_read_registers            failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr_local, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[reg_start_index]);
     }
     else
     {
         for (int index = reg_start_index; index < (reg_start_index + reg_count); index++)
         {
-            ESP_LOGI(TAG, "drv_i2c_master_read_from_register success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGI(TAG, "hdc1080_read_registers            success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
             i2c_reg_addr_local++;
         }
 
@@ -254,20 +255,20 @@ static void hdc1080_read_measurement(size_t reg_count)
     i2c_err = drv_i2c_master_read_pointed_register(i2c_index, 
                                                 i2c_dev_addr,
                                                 (uint8_t*)&i2c_reg_cfg_swap[0], sizeof(i2c_reg_data[0]) * reg_count,
-                                                rdwr_timeout);
+                                                meas_timeout);
     for(int index = 0; index < reg_count; index++)
     {
         i2c_reg_data[HDC1080_INDEX_TEMPERATURE + index] = __bswap16(i2c_reg_cfg_swap[index]);
     }
     if (i2c_err != ESP_OK)
     {
-        ESP_LOGE(TAG, "drv_i2c_master_read_from_register failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr_local, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[HDC1080_INDEX_TEMPERATURE]);
+        ESP_LOGE(TAG, "hdc1080_read_measurement          failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr_local, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[HDC1080_INDEX_TEMPERATURE]);
     }
     else
     {
         for (int index = HDC1080_INDEX_TEMPERATURE; index < (HDC1080_INDEX_TEMPERATURE + reg_count); index++)
-        {
-            ESP_LOGI(TAG, "drv_i2c_master_read_from_register success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+        {                           
+            ESP_LOGI(TAG, "hdc1080_read_measurement          success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
             i2c_reg_addr_local++;
         }
 
@@ -282,7 +283,7 @@ static void hdc1080_task(void* arg)
     while (hdc1080_task_active)
     {
         hdc1080_trigger_measurement();
-        vTaskDelay(meas_timeout);
+        vTaskDelay(measure_wait);
         hdc1080_read_measurement(2);
         vTaskDelay(loop_timeout);
     }
@@ -310,12 +311,12 @@ static void hdc1080_read_id_registers(void)
         i2c_reg_data[index] = __bswap16(i2c_reg_cfg_swap);
 
         if (i2c_err != ESP_OK)
-        {
-            ESP_LOGE(TAG, "drv_i2c_master_read_from_register failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[index]);
+        {                        
+            ESP_LOGE(TAG, "hdc1080_read_id_registers         failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[index]);
         }
         else
-        {
-            ESP_LOGI(TAG, "drv_i2c_master_read_from_register success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+        {                     
+            ESP_LOGI(TAG, "hdc1080_read_id_registers         success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
         }
 
         i2c_reg_addr++;
@@ -346,11 +347,11 @@ static void hdc1080_read_configuration_register(void)
 
         if (i2c_err != ESP_OK)
         {
-            ESP_LOGE(TAG, "drv_i2c_master_read_from_register failure reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[index]);
+            ESP_LOGE(TAG, "hdc1080_read_configuration_register  fail reg[0x%02X] error:%d (%s) name:%s", i2c_reg_addr, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[index]);
         }
         else
         {
-            ESP_LOGI(TAG, "drv_i2c_master_read_from_register success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGI(TAG, "hdc1080_read_configuration_register  pass reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
         }
 
         i2c_reg_addr++;
