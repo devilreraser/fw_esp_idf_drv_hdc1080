@@ -18,6 +18,7 @@ extern "C"
 /* *****************************************************************************
  * Header Includes
  **************************************************************************** */
+#include "stdint.h"
     
 /* *****************************************************************************
  * Configuration Definitions
@@ -46,6 +47,12 @@ extern "C"
 /* *****************************************************************************
  * Function Prototypes
  **************************************************************************** */
+float drv_hdc1080_get_temperature(void);
+float drv_hdc1080_get_humidity(void);
+uint16_t drv_hdc1080_get_temperature_raw(void);
+uint16_t drv_hdc1080_get_humidity_raw(void);
+
+
 void drv_hdc1080_init(void);
 void drv_hdc1080_deinit(void);
 

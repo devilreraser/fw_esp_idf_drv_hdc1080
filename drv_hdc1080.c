@@ -136,7 +136,8 @@ char* i2c_reg_name[HDC1080_REGISTER_COUNT] =
 };
 TickType_t rdwr_timeout = pdMS_TO_TICKS(10);
 TickType_t meas_timeout = pdMS_TO_TICKS(20);
-TickType_t loop_timeout = pdMS_TO_TICKS(1000);
+TickType_t init_timeout = pdMS_TO_TICKS(1000);
+TickType_t loop_timeout = pdMS_TO_TICKS(10000);
 TickType_t measure_wait = pdMS_TO_TICKS(20);
 bool hdc1080_task_active = false;
 
@@ -151,6 +152,25 @@ drv_i2c_e_index_t i2c_index = DRV_HDC1080_PORT;
 /* *****************************************************************************
  * Functions
  **************************************************************************** */
+float drv_hdc1080_get_temperature(void)
+{
+    return (float)i2c_reg_data[HDC1080_INDEX_TEMPERATURE] / 65536.0 * 165.0 - 40.0;
+}
+
+float drv_hdc1080_get_humidity(void)
+{
+    return (float)i2c_reg_data[HDC1080_INDEX_HUMIDITY] / 65536.0 * 100.0;
+}   
+
+uint16_t drv_hdc1080_get_temperature_raw(void)
+{
+    return i2c_reg_data[HDC1080_INDEX_TEMPERATURE];
+}
+
+uint16_t drv_hdc1080_get_humidity_raw(void)
+{
+    return i2c_reg_data[HDC1080_INDEX_HUMIDITY];
+}
 
 #if TO_DO_UNCOMMENT_IF_NEEDED
 
@@ -179,7 +199,7 @@ static void hdc1080_read_registers(i2c_e_register_index_t reg_start_index, size_
     {
         for (int index = reg_start_index; index < (reg_start_index + reg_count); index++)
         {
-            ESP_LOGI(TAG, "hdc1080_read_registers            success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGD(TAG, "hdc1080_read_registers            success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
             i2c_reg_addr_local++;
         }
 
@@ -212,11 +232,11 @@ static void hdc1080_write_registers(i2c_e_register_index_t reg_start_index, size
         // maybe not needed trigger implement saparately because no stop condition needed
         // if (reg_count == 0)
         // {
-        //     ESP_LOGI(TAG, "drv_i2c_master_write_to_register success reg[0x%02x] point only name:%s", i2c_reg_addr_local, i2c_reg_name[reg_start_index]);
+        //     ESP_LOGD(TAG, "drv_i2c_master_write_to_register success reg[0x%02x] point only name:%s", i2c_reg_addr_local, i2c_reg_name[reg_start_index]);
         // }
         for (int index = reg_start_index; index < (reg_start_index + reg_count); index++)
         {
-            ESP_LOGI(TAG, "drv_i2c_master_write_to_register success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGD(TAG, "drv_i2c_master_write_to_register success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
             i2c_reg_addr_local++;
         }
 
@@ -237,11 +257,11 @@ static void hdc1080_trigger_measurement(void)
                                                 rdwr_timeout);
     if (i2c_err != ESP_OK)
     {
-        ESP_LOGE(TAG, "drv_i2c_master_point_to_register failure reg[0x%02x] error:%d (%s) name:%s", i2c_reg_addr_local, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[HDC1080_INDEX_TEMPERATURE]);
+        ESP_LOGE(TAG, "drv_i2c_master_point_to_register  failure reg[0x%02x] error:%d (%s) name:%s", i2c_reg_addr_local, i2c_err, esp_err_to_name(i2c_err), i2c_reg_name[HDC1080_INDEX_TEMPERATURE]);
     }
     else
     {
-        ESP_LOGI(TAG, "drv_i2c_master_point_to_register success reg[0x%02x] point only name:%s", i2c_reg_addr_local, i2c_reg_name[HDC1080_INDEX_TEMPERATURE]);
+        ESP_LOGD(TAG, "drv_i2c_master_point_to_register  success reg[0x%02x] point only name:%s", i2c_reg_addr_local, i2c_reg_name[HDC1080_INDEX_TEMPERATURE]);
     }
 
 }
@@ -268,7 +288,7 @@ static void hdc1080_read_measurement(size_t reg_count)
     {
         for (int index = HDC1080_INDEX_TEMPERATURE; index < (HDC1080_INDEX_TEMPERATURE + reg_count); index++)
         {                           
-            ESP_LOGI(TAG, "hdc1080_read_measurement          success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGD(TAG, "hdc1080_read_measurement          success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
             i2c_reg_addr_local++;
         }
 
@@ -279,6 +299,8 @@ static void hdc1080_read_measurement(size_t reg_count)
 static void hdc1080_task(void* arg)
 {
     hdc1080_task_active = true;
+
+    vTaskDelay(init_timeout);
 
     while (hdc1080_task_active)
     {
@@ -316,7 +338,7 @@ static void hdc1080_read_id_registers(void)
         }
         else
         {                     
-            ESP_LOGI(TAG, "hdc1080_read_id_registers         success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGD(TAG, "hdc1080_read_id_registers         success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
         }
 
         i2c_reg_addr++;
@@ -351,7 +373,7 @@ static void hdc1080_read_configuration_register(void)
         }
         else
         {
-            ESP_LOGI(TAG, "hdc1080_read_configuration_register  pass reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
+            ESP_LOGD(TAG, "hdc1080_read_configuration_register  pass reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr, i2c_reg_data[index], i2c_reg_data[index], i2c_reg_name[index]);
         }
 
         i2c_reg_addr++;
@@ -379,7 +401,7 @@ static void hdc1080_init_configuration_register(void)
     }
     else
     {
-        ESP_LOGI(TAG, "drv_i2c_master_write_to_register  success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_cfg, i2c_reg_cfg, i2c_reg_name[HDC1080_INDEX_CONFIGURATION]);
+        ESP_LOGD(TAG, "drv_i2c_master_write_to_register  success reg[0x%02x]=%5d (0x%04X) name:%s", i2c_reg_addr_local, i2c_reg_cfg, i2c_reg_cfg, i2c_reg_name[HDC1080_INDEX_CONFIGURATION]);
     }
 
 }
@@ -410,15 +432,23 @@ void drv_hdc1080_init(void)
 
     hdc1080_read_configuration_register();
 
+
+
+
     if ((i2c_reg_data[HDC1080_INDEX_CONFIGURATION] & HDC1080_CONFIGURATION_CHECK_MASK) != (i2c_reg_cfg & HDC1080_CONFIGURATION_CHECK_MASK))
     {
         ESP_LOGE(TAG, "drv_hdc1080_init configuration failure");
+        esp_log_level_set(TAG, ESP_LOG_DEBUG);      /* set DEBUG Level on Failure Init */
         return;
     }
     else
     {
         ESP_LOGI(TAG, "drv_hdc1080_init configuration success");
+        esp_log_level_set(TAG, ESP_LOG_INFO);      /* set INFO Level on Success Init */
     }
+
+
+
 
     xTaskCreate(&hdc1080_task, "hdc1080_task", 2048, NULL, 5, NULL);
 
